@@ -3,6 +3,9 @@
 ####################################
 
 # 2024-11-27
+# 2025-04-01
+# edit to ensure output raster has same extent as contemporary covariates
+# probably should clip water temperature...
 
 # Given a GCM model name
 # Load the covariates matching the model
@@ -13,8 +16,11 @@
 
 processLGM <- function(model){
   
-  # define pathnames for model covariates
+  # define pathnames for lgm model covariates
   fn <- list.files("data/LGM covariates", full.names = T, pattern = model)
+  
+  # load contemporary covariate stack
+  covs <- readRDS("~/nektonAES/data/covariate_stack.rds")
   
   # define projection
   prj <- "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
@@ -39,9 +45,13 @@ processLGM <- function(model){
   r <- raster::crop(r, raster::extent(-180, 180, -90, -30)) # crop to southern hemisphere
   
   r <- raster::projectRaster(r,
-                             res = 25000,
+                             covs, # align to contemporary covariates
                              method = "bilinear",
                              crs = "+proj=stere +lat_0=-90 +lat_ts=-70 +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+  
+  r <- mask(r, subset(covs, 1)) # crop to same extent as contemporary covariates
+  
+  r$tos[r$tos < -1.8] <- -1.8 # force minimum temperature
   
   # sea ice concentration is a bit more complicated
   sic <- ncdf4::nc_open(fn[2])          # open ncdf
